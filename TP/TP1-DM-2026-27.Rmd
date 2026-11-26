@@ -1,1 +1,341 @@
 
+---
+title: 'TP N°1 : Traitement des données manquantes'
+subtitle: "M2 SID 2026-2027 - Modélisation statistique avancée"
+author: "Nom Prénom"
+output:
+  html_document: default
+  pdf_document: default
+fontsize: 12pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, eval=FALSE)
+# eval=FALSE signifie que le code n'est pas exécuté lors du knit en fichier HTML
+# Modifier par eval=TRUE pour obtenir un fichier html complet une fois tous les chunks exécutés.
+```
+
+---
+
+# 1. Consignes générales
+
+1. L'objectif de ces TPs est de comprendre le code pour être capable de le réutiliser, de comprendre et commenter les sorties en vue de fournir des interprétations pertinentes des résultats.
+3. Les fichiers de données et les programmes Rmarkdown sont disponibles sur Moodle.
+4. Pour chaque TP, vous disposerez d'un fichier Rmarkdown à ouvrir sous `R` et à sauvegarder en .RMD, qui contient l'énoncé du TP correspondant. Vous devrez le compléter soit par du code soit par des commentaires. Des zones de réponses sont prévues à cet effet dans le fichier.
+5. Le travail réalisé pendant les TP est à rendre sur Moodle à la fin de chaque séance en ayant compilé (`knit`) votre fichier final Rmarkdown en HTML (avec `eval=TRUE` dans le premier chunk pour afficher les sorties logicielles).
+6. Des corrigés de chaque exercice seront postés sur Moodle.
+
+---
+
+# 2. Consignes pour ce TP
+
+L'objectif de ce TP est de mettre en pratique sous R la démarche de traitement des données manquantes (DM dans la suite de cette feuille) : 
+
+- Visualisation des données manquantes
+- Analyse sur données complètes 
+- Imputation simple
+- Imputation multiple}
+
+Installez les packages nécessaires pour ce TP (à mettre en commentaire une fois installés).
+```{r, echo=TRUE}
+#install.packages("mice")
+#install.packages("skimr")
+#install.packages("PerformanceAnalytics")
+#install.packages("zoo")
+#install.packages("VIM")
+#install.packages("UpSetR")
+#install.packages("naniar")
+```
+
+Pour ce travail, on utilisera le dataframe `airquality` (noté d dans le code) disponible dans la librairie `mice` dont l'objectif est de modéliser l'ozone en fonction des 3 variables météorologiques. 
+```{r}
+library(mice)
+d=data.frame(airquality[,c(1:4)])
+```
+
+---
+
+# 3. Visualisation des données manquantes
+
+La fonction habituelle summary permet d'obtenir une analyse univariée du jeu de données, avec le nombre de DM s'il y en a. Une alternative est la fonction `skim` de la librairie `skimr`.
+
+```{r}
+library(skimr)
+print(skimr::skim(d))
+```
+Plusieurs librairies et fonctions existent pour :
+
+- visualiser quelles variables et/ou quels individus sont concernés par les DM,
+- comprendre le type de DM et le mécanisme de génération,
+- déterminer d'éventuels patterns de DM. 
+
+On vous donne ci-dessous un panorama de ces librairies et fonctions qui peuvent donner des résultats semblables mais visualisés sous des formes différentes. 
+  
+- la fonction `md.pattern` de `mice` : fournit un tableau et un graphique récapitulant le nombre de DM par variable, les combinaisons de variables soumises à des DM et le nombre de cas correspondants. 
+```{r}
+library(mice)
+md.pattern(d)
+```
+
+- la fonction `vismiss` de `visdat` : donne le pourcentage de DM global et par variable, et visualise les DM par individu (en ligne). 
+```{r}
+library(visdat)
+vis_miss(d)
+```
+
+- dans la librairie `naniar` : 
+
+  + la fonction `gg_miss_points` remplace les DM par des valeurs 10% plus basses que le minimum observé de la variable, permettant ainsi de les visualiser. 
+  + la fonction `gg_miss_var` affiche le nombre de DM sous forme de diagramme en barre.
+  + la fonction `gg_miss_case` affiche le nombre de DM par individu (en ligne). 
+  + la fonction `gg_miss_fct` affiche le pourcentage de DM de chaque variable en fonction d'une variable catégorielle du jeu de données (non-utilisable sur notre jeu de données car ne contient pas de variable catégorielle).
+```{r}
+library(ggplot2)
+library(naniar)
+ggplot(data=d) +
+  aes(x=Ozone, y=Solar.R) + 
+  geom_miss_point()
+gg_miss_var(d)
+gg_miss_case(d)
+```
+
+- la fonction `gg_miss_upset` de la librairie `UpSetR` permet de visualiser les combinaisons de DM et les profils de DM les plus fréquemment observés. 
+```{r}
+library(UpSetR)
+gg_miss_upset(d)
+```
+
+- les fonctions `marginplot` et `histmiss` de la librairie `VIM` permettent de visualiser la distribution de 2 variables de votre choix en différenciant les données observées (bleues) et manquantes (rouges). La fonction `histmiss` peut être utilisée également pour visualiser la distribution des variables après imputation, en différenciant valeurs observées et valeurs imputées. 
+```{r}
+library(VIM)
+marginplot(d[,c("Ozone","Solar.R")])
+par(mfrow=c(2,1))
+histMiss(d[,c("Ozone","Solar.R")])
+histMiss(d[,c("Ozone","Solar.R")], only.miss = FALSE)
+```
+
+A l'aide de ces fonctions, faire une synthèse sur les DM de ce jeu de données.
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+---
+
+# 4. Analyse des données complètes
+
+La première approche en présence de DM est d'analyser uniquement les données complètes, en supprimant les individus ayant au moins une valeur manquante sur l'ensemble des variables. Même si cette approche peut donner des résultats biaisés et/ou imprécis, il convient de la mettre en oeuvre comme analyse de référence à laquelle on pourra comparer les résultats après imputation. 
+
+Expliquez ce que font les 3 parties du code ci-dessous, et commentez les résultats obtenus. 
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+```{r}
+# is.na(d)  
+# which(is.na(d),arr.ind=TRUE)
+d.miss <- which(is.na(d),arr.ind=TRUE)[,1]
+d.obs <- d[-d.miss,]
+
+summary(d.obs[,1:4])
+library(PerformanceAnalytics)
+chart.Correlation(d.obs[,1:4])
+
+reglin.obs = lm(Ozone~Solar.R+Temp+Wind, data=d.obs)
+summary(reglin.obs)
+```
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+---
+
+# 5. Imputation simple
+
+Plusieurs méthodes d'imputation simples sont disponibles. Pour rappel, ces méthodes donnent une seule valeur de remplacement pour chaque DM. Vous mettrez ici en oeuvre l'imputation par la moyenne, l'imputation par les K-plus proches voisins (KNN) et l'imputation Hot-Deck. 
+
+On vous demande de visualiser les résultats de l'imputation, d'analyser le jeu de données complété en reproduisant les analyses statistiques précédentes ($\S 4$) et en les comparant à celles obtenues sur les données complètes. Pour cela, complétez le code si besoin. 
+
+## 5.1. Completion stationnaire
+
+La librairie `zoo` propose une fonction `na.aggregate` dont l'argument `FUN=...` permet de préciser le type d'indicateur statistique (moyenne, médiane, ...) utilisé pour remplacer les DM. 
+
+```{r}
+library(zoo)
+d.imp = d
+d.imp <- na.aggregate(d, FUN = mean)
+summary(d.imp[,1:4])
+chart.Correlation(d.imp[,1:4])
+summary(lm(Ozone~Solar.R+Temp+Wind, data=d.imp))
+```
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+## 5.2. Imputation par régression
+
+On peut imputer une valeur manquante sur une variable par une régression linéaire de cette variable en fonction des autres variables disponibles. 
+
+```{r}
+d.reg=regressionImp(Ozone+Solar.R ~ Wind + Temp, data=d)
+```
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+## 5.3. Imputation par KNN 
+
+On utilise ici la fonction `kNN` de la librairie `VIM`. 
+```{r}
+d.knn=kNN(d, k=5)
+```
+Par défaut, K est fixé à 5. Vous pouvez tester différentes valeurs de K et examiner les conséquences. 
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+## 5.4. Imputation par Hot-Deck 
+
+On utilise ici la fonction `hotdeck` de la librairie `VIM`. 
+```{r}
+d.HD=hotdeck(d)
+```
+Note : Vous pouvez y spécifier la (ou les) variable(s) concernée(s) par les DM (variable=...) et éventuellement la (ou les) variable(s) définissant des sous-groupes d'individus (domain_var).  
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+---
+
+# 6. Imputation multiple
+
+Pour rappel, l'imputation multiple se décompose en plusieurs phases :
+
+- duplication du jeu de données (avec introduction d'aléa sur les variables ou sur les individus)
+- imputation des DM sur chaque jeu de données 
+- estimation statistique sur chaque jeu de données imputé 
+- estimation finale par combinaison des estimations intermédiaires.
+
+L'un des algorithmes d'imputation de données manquantes le plus performant est l'algorithme `MICE`. Pour rappel, cette méthode d'imputation multiple est basée sur une approche itérative bayésienne : à chaque variable, est associé un modèle d'imputation conditionnellement aux autres variables du jeu de données. Une première étape estime les paramètres de ces modèles à partir des données observés et imputées à l'itération précédente. La deuxième étape consiste à remplacer les données manquantes par les prédictions à partir des paramètres simulés avant. On obtient ainsi plusieurs jeux de données imputés, qui sont analysés un par un. Ces résultats sont alors combinés. 
+
+Le package R du même nom permet de mettre en oeuvre un grand nombre de méthodes d'imputation (tirage aléatoire, régression linéaire, régression logistique, arbre de régression ou de classification, ...). Il permet également de visualiser les données manquantes (comme vu au début du TP), de diagnostiquer la qualité des valeurs imputées, d'analyser chaque jeu de données et de combiner les résultats des analyses. 
+
+Le package `mice` contient plusieurs fonctions : 
+
+- `mice(d, m=5)` pour imputer les données sur m jeux de données dupliqués (5 par défaut) à partir du jeu de données initial `d` ;
+- `with()` pour analyser chaque jeu de données imputé, en spécifiant l'analyse à réaliser, par exemple un modèle de régression linéaire ;
+- `pool()` pour combiner les m analyses réalisées ;
+- `complete(, i)` pour exporter le ième jeu de données imputé. 
+
+
+## 6.1. Phase d'imputation
+```{r}
+d.mice = mice(d)
+summary(d.mice)
+str(d.mice)
+```
+Etudier et comprendre la structure du dataframe obtenu `d.mice`.  
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+## 6.2. Phase d'analyses statistiques sur jeu de données complété 
+
+On peut sélectionner un des jeu de données complété et l'analyser : 
+```{r}
+d.mice1 = complete(d.mice,1)
+summary(lm(Ozone ~Solar.R + Temp + Wind, data=d.mice1))
+```
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+On peut également analyser tous les jeux de données complétés : 
+```{r}
+reglin.mice=with(d.mice, lm(Ozone ~ Solar.R + Temp + Wind))
+summary(reglin.mice)
+```
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+Examinez la variabilité des estimations des 5 modèles.
+```{r}
+xyplot(d.mice,Ozone ~ Wind+Temp+Solar.R,pch=18,cex=1)
+densityplot(d.mice)
+stripplot(d.mice, pch = 20, cex = 1.2)
+```
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+## 6.3.Phase d'analyse combinée 
+```{r}
+reglin.mice.pool=pool(reglin.mice)
+summary(reglin.mice.pool)
+```
+Expliquez comment sont obtenues les estimations finales. 
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+---
+
+# 7. Simulation de valeurs manquantes pour évaluation des performances des méthodes d'imputation
+
+La première étape est de simuler des données manquantes à partir du jeu de données complet. 
+```{r}
+d.simu = d.obs
+d.simu$Ozone[sample(1:nrow(d.obs), size = 30)] = NA
+head(d.simu)
+```
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+Appliquez les différentes méthodes d'imputation (cf code R) et comparez leurs qualités en calculant les indicateurs de performance. 
+```{r}
+# imputation par moyenne 
+d.imp <- na.aggregate(d.simu, FUN = mean)
+RMSE.mean=sqrt((sum((d.obs$Ozone-d.imp$Ozone)^2)/length(d.obs)))
+MAE.mean=sum(abs(d.obs$Ozone-d.imp$Ozone))/length(d.obs)
+
+# Imputation simple par régression linéaire
+d.reg=regressionImp(Ozone ~ Solar.R + Wind + Temp, data=d.simu)
+RMSE.reg=sqrt((sum((d.obs$Ozone-d.reg$Ozone)^2)/length(d.obs)))
+MAE.reg=sum(abs(d.obs$Ozone-d.reg$Ozone))/length(d.obs)
+
+# Imputation simple par KNN
+d.knn=kNN(d.simu, k=5)
+RMSE.knn=sqrt((sum((d.obs$Ozone-d.knn$Ozone)^2)/length(d.obs)))
+MAE.knn=sum(abs(d.obs$Ozone-d.knn$Ozone))/length(d.obs)
+
+# Imputation simple par Hot-deck
+d.HD=hotdeck(d.simu)
+RMSE.HD=sqrt((sum((d.obs$Ozone-d.HD$Ozone)^2)/length(d.obs)))
+MAE.HD=sum(abs(d.obs$Ozone-d.HD$Ozone))/length(d.obs)
+```
+
+Pour l'imputation multiple, le calcul des indicateurs est un peu différent. Expliquez pourquoi.  
+```{r}
+d.mice = mice(d.simu, m=5)
+d.mice.mean=(complete(d.mice,1)+complete(d.mice,2)+complete(d.mice,3)+complete(d.mice,4)+complete(d.mice,5))/5
+RMSE.mice=sqrt((sum((d.obs$Ozone-d.mice.mean$Ozone)^2)/length(d.obs)))
+MAE.mice=sum(abs(d.obs$Ozone-d.mice.mean$Ozone))/length(d.obs)
+```
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+Conclure sur la meilleure méthode d'imputation. 
+```{r}
+cbind(RMSE.mean, RMSE.reg, RMSE.knn, RMSE.HD, RMSE.mice)
+cbind(MAE.mean, MAE.reg, MAE.knn, MAE.HD, MAE.mice)
+```
+
+<span style="color:blue"> <!-- Commmentez ci-dessous --> 
+</span>
+
+---
+
+
+# Fin du TP
+
+A la fin du TP, enregistrez ce document en `.RMD` et le transformer au format HTML par `knit`. Ne pas oublier de modifier dans le premier chunk `eval=FALSE` par `eval=TRUE` pour obtenir un fichier html complet (avec les sorties R). Déposer le fichier HTML sur moodle. 
